@@ -35,43 +35,43 @@
   </locale>
   
   <macro name="juris-pretitle">
-      <choose>
-        <if type="regulation">
-          <group delimiter=" of " suffix=",">
-            <group delimiter=" of the ">
-              <group delimiter=" ">
-                <choose>
-                  <if match="none" variable="contributor">
-                    <names variable="authority">
-                      <name/>
-                      <institution institution-parts="short"/>
-                    </names>
-                  </if>
-                </choose>
-                <choose>
-                  <if variable="genre">
-                    <text variable="genre"/>
-                    <number variable="number"/>
-                  </if>
-                </choose>
+    <!-- Bluebook 21.9(a)(ii): issuing institution, type, number; for Parliament acts
+         "Directive 2001/18, of the European Parliament and of the Council"; the date
+         only with the full name (a title). -->
+    <choose>
+      <if type="regulation">
+        <group delimiter=" of ">
+          <choose>
+            <if variable="contributor">
+              <group delimiter=", of the ">
+                <group delimiter=" ">
+                  <text variable="genre"/>
+                  <text variable="number"/>
+                </group>
+                <names variable="contributor">
+                  <name delimiter=" and of the "/>
+                </names>
               </group>
-              <choose>
-                <if match="any" variable="contributor">
-                  <names variable="contributor">
-                    <name/>
-                    <institution institution-parts="short" and="text"/>
-                  </names>
-                </if>
-              </choose>
-            </group>
-            <choose>
-              <if variable="genre">
-                <date variable="issued" date-parts="year-month-day" form="text"/>
-              </if>
-            </choose>
-          </group>
-        </if>
-      </choose>
+            </if>
+            <else>
+              <group delimiter=" ">
+                <names variable="authority">
+                  <name/>
+                  <institution institution-parts="short"/>
+                </names>
+                <text variable="genre"/>
+                <text variable="number"/>
+              </group>
+            </else>
+          </choose>
+          <choose>
+            <if variable="title">
+              <date variable="issued" form="text" date-parts="year-month-day"/>
+            </if>
+          </choose>
+        </group>
+      </if>
+    </choose>
   </macro>
   
   <macro name="juris-title">
@@ -93,10 +93,38 @@
         </group>
       </if>
       <else-if type="regulation">
-        <group delimiter=" ">
-          <date variable="publication-date" form="text" date-parts="year" prefix="[" suffix="]"/>
-          <text variable="container-title" form="short"/>
-          <number variable="page-first"/>
+        <!-- Bluebook 21.9(a)(i): "art. 5, 1990 O.J. (L 266) 1, 2" -->
+        <group delimiter=", ">
+          <choose>
+            <if position="first">
+              <choose>
+                <if locator="page"/>
+                <else-if variable="locator">
+                  <group delimiter=" ">
+                    <label variable="locator" form="short"/>
+                    <text variable="locator"/>
+                  </group>
+                </else-if>
+              </choose>
+            </if>
+          </choose>
+          <group delimiter=", ">
+            <group delimiter=" ">
+              <date variable="publication-date" form="text" date-parts="year"/>
+              <text variable="container-title" form="short"/>
+              <text variable="issue" prefix="(" suffix=")"/>
+              <number variable="page-first"/>
+            </group>
+            <choose>
+              <if position="first">
+                <choose>
+                  <if locator="page">
+                    <text variable="locator"/>
+                  </if>
+                </choose>
+              </if>
+            </choose>
+          </group>
         </group>
       </else-if>
       <else-if type="legislation">
@@ -137,8 +165,11 @@
           <if match="none" variable="genre">
             <date variable="issued" form="text" date-parts="year-month-day" prefix="(" suffix=")"/>
           </if>
+          <else-if variable="publisher">
+            <!-- Bluebook 21.9(a)(ii): (EC), (EU), (Euratom) -->
+            <text variable="publisher" prefix="(" suffix=")"/>
+          </else-if>
         </choose>
-        
       </if>
       <else-if type="hearing">
         <group delimiter=" " prefix="(" suffix=")">
@@ -154,13 +185,41 @@
   </macro>
 
   <macro name="juris-pretitle-short">
-    <text value=""/>
+    <!-- short form: the designation, unless a short title is given -->
+    <choose>
+      <if type="regulation">
+        <choose>
+          <if variable="title-short"/>
+          <else>
+            <group delimiter=" ">
+              <choose>
+                <if variable="contributor"/>
+                <else>
+                  <names variable="authority">
+                    <name/>
+                    <institution institution-parts="short"/>
+                  </names>
+                </else>
+              </choose>
+              <text variable="genre"/>
+              <text variable="number"/>
+            </group>
+          </else>
+        </choose>
+      </if>
+      <else>
+        <text value=""/>
+      </else>
+    </choose>
   </macro>
   <macro name="juris-title-short">
     <choose>
-      <if match="any" type="legal_case regulation legislation hearing report">
-        <text variable="title"/>
+      <if type="regulation">
+        <text variable="title-short"/>
       </if>
+      <else-if match="any" type="legal_case legislation hearing report">
+        <text variable="title"/>
+      </else-if>
     </choose>
   </macro>
 
@@ -173,6 +232,12 @@
   </macro>
 
   <macro name="juris-locator">
+    <choose>
+      <if type="regulation" position="first">
+        <!-- first cites: the pin is printed by juris-main (article before, page after the O.J. cite) -->
+        <text value=""/>
+      </if>
+      <else>
     <group delimiter=" ">
       <choose>
         <if>
@@ -203,6 +268,8 @@
       </choose>
       <number variable="locator"/>
     </group>
+      </else>
+    </choose>
   </macro>
   <citation>
     <layout>
