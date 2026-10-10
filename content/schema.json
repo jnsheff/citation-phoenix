@@ -19,6 +19,10 @@
     "legalCommentary": {
       "zotero": "bookSection",
       "csl": "legal_commentary"
+    },
+    "restatement": {
+      "zotero": "book",
+      "csl": "book"
     }
     
   },
@@ -540,6 +544,32 @@
       "volumeTitle",
       "numberOfVolumes",
       "edition",
+      "place",
+      "publisher",
+      "date",
+      "numPages",
+      "medium",
+      "language",
+      "ISBN",
+      "shortTitle",
+      "url",
+      "accessDate",
+      "archive",
+      "archiveLocation",
+      "libraryCatalog",
+      "callNumber",
+      "rights",
+      "extra"
+    ],
+    "restatement": [
+      "title",
+      "abstractNote",
+      "edition",
+      "series",
+      "seriesNumber",
+      "volume",
+      "volumeTitle",
+      "numberOfVolumes",
       "place",
       "publisher",
       "date",
