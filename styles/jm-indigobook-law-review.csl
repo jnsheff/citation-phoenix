@@ -226,7 +226,7 @@
           <group delimiter=" ">
             <group delimiter=", ">
               <choose>
-                <if type="hearing report legal_case">
+                <if type="hearing report legal_case regulation">
                   <text macro="juris-pretitle"/>
                 </if>
               </choose>

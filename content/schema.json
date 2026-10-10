@@ -378,6 +378,9 @@
       },
       {
         "field": "publisher"
+      },
+      {
+        "field": "seriesIssue"
       }
     ],
     "treaty": [
@@ -1157,6 +1160,7 @@
       "code",
       "codeNumber",
       "pages",
+      "seriesIssue",
       "dateEnacted",
       "section",
       "publisher",
@@ -1439,7 +1443,8 @@
       "jurisdiction"
     ],
     "issue": [
-      "meetingNumber"
+      "meetingNumber",
+      "seriesIssue"
     ],
     "section": [
       "opus"

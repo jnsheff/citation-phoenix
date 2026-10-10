@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>EUR-Lex translator harness</title></head>
+<body><pre id="out">running…</pre>
+<script>
+// Runs translators/EUR-Lex (legal).js against each fixture with a minimal Zotero mock.
+// Serve the repository root (python3 -m http.server) and open /scripts/test-eurlex-translator.html.
+const FIXTURES = [
+  ['scripts/eurlex-fixtures/eurlex-gdpr-2016.html', 'https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:32016R0679'],
+  ['scripts/eurlex-fixtures/eurlex-aiact-2024.html', 'https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=OJ:L_202401689'],
+  ['scripts/eurlex-fixtures/eurlex-directive-1993-synthetic.html', 'https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:31993L0013'],
+];
+async function main() {
+  let src = await (await fetch('../translators/EUR-Lex.js')).text();
+  src = src.replace(/^\s*\{[\s\S]*?\n\}\s*\n/, '');            // drop the JSON header
+  const out = [];
+  for (const [file, url] of FIXTURES) {
+    const html = await (await fetch('../' + file)).text();
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    const items = [];
+    function Item(type) { this.itemType = type; this.attachments = []; this.creators = []; this.complete = () => items.push(this); }
+    const run = new Function('Zotero', 'doc', 'url', src + '\nreturn { d: detectWeb(doc, url), w: (doWeb(doc, url), 1) };');
+    const r = run({ Item }, doc, url);
+    const it = items[0] ? Object.assign({}, items[0]) : null;
+    if (it) { delete it.attachments; delete it.complete; }
+    out.push(file + '\n detectWeb: ' + r.d + '\n' + JSON.stringify(it, null, 1));
+  }
+  document.getElementById('out').textContent = out.join('\n\n');
+}
+main().catch(e => document.getElementById('out').textContent = 'ERROR ' + e + '\n' + e.stack);
+</script></body></html>
