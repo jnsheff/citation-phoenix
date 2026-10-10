@@ -9,7 +9,7 @@
 	"inRepository": true,
 	"translatorType": 4,
 	"browserSupport": "gcsibv",
-	"lastUpdated": "2026-03-22 15:23:45"
+	"lastUpdated": "2026-10-10 20:28:51"
 }
 
 function detectWeb(doc, url) {
@@ -25,6 +25,10 @@ function detectWeb(doc, url) {
 	}
 	if (/\|\s*Regulations\s*\|/i.test(head)) {
 		return "regulation"
+	}
+	// Restatements of the Law (American Law Institute) are secondary sources with no "| Cases |"-style marker in the title
+	if (isRestatement(restatementHeading(doc))) {
+		return "book"
 	}
 }
 
@@ -79,6 +83,26 @@ function doWeb(doc, url) {
 		return
 	}
 	var NewItem = new Zotero.Item(type)
+	if (type == "book") {
+		// a restatement: saved as the work (title without the section), as citation-phoenix's "restatement" type
+		let heading = restatementHeading(doc)
+		let parsed = parseRestatement(heading)
+		let year = parsed.year || restatementCopyrightYear(doc)
+		NewItem.title = fullRestatementTitle(doc, parsed.name)
+		NewItem.creators.push({ lastName: 'American Law Institute', creatorType: 'author', fieldMode: 1 })
+		NewItem.publisher = 'American Law Institute'
+		if (year) NewItem.date = year
+		if (parsed.edition) NewItem.edition = parsed.edition
+		NewItem.extra = restatementExtra()
+		if (parsed.section) {
+			NewItem.notes.push({ note: 'Section: ' + restatementSectionName(doc, parsed.section) })
+		}
+		let snapshotNote = getSnapshotNote(heading, doc)
+		if (snapshotNote) {
+			NewItem.notes.push({ note: snapshotNote })
+		}
+		NewItem.complete()
+	}
 	if (type == "case") {
 		NewItem.caseName = ZU.xpathText(doc, '//*[@id="co_docHeaderTitleLine"]')
 			|| ZU.xpathText(doc, '//*[@id="title"]')
@@ -265,6 +289,98 @@ function westlawURL(item) { //some items (unpublished ones) will have Archive fi
 }
 
 
+
+//Restatements of the Law (American Law Institute). The functions from isRestatement to restatementExtra are shared
+//with translators/Lexis+.js (scripts/test-restatement-translators.html checks that the copies agree).
+
+//The heading that names the work. A secondary-source page puts the section's name in <title> ("§ 18:2. Anti-assignment-in-gross
+//rule | Secondary Sources | ..."), and the work in the citation line (.co_cites, "2 McCarthy on Trademarks § 18:2 (5th ed.)") and
+//the publication line, so look there first: "Restatement (Second) of Torts § 402A (1965)".
+function restatementHeading(doc) {
+	let candidates = [
+		cleanText(ZU.xpathText(doc, '//*[contains(@class, "co_cites")]')),
+		cleanText(ZU.xpathText(doc, '//*[contains(@class, "co_publicationLine")]//*[contains(@class, "co_headtext")]')),
+		cleanText(ZU.xpathText(doc, '//*[@id="co_docHeaderTitleLine"]')),
+		cleanText(ZU.xpathText(doc, '//meta[@property="og:title"]/@content')),
+		cleanText(ZU.xpathText(doc, '//title'))
+	]
+	for (let candidate of candidates) {
+		let line = candidate.replace(/\s+\|\s+.*$/, '')
+		if (isRestatement(line)) return line
+	}
+	return ''
+}
+
+//Westlaw's citation line abbreviates ("Restatement (Third) of Torts: Phys. & Emot. Harm § 34 (2010)"), but the breadcrumb above the
+//text, in document order series > work > chapter > section, has the work's full title ("... Liability for Physical and Emotional Harm").
+function fullRestatementTitle(doc, name) {
+	let base = name.split(':')[0]
+	for (let node of ZU.xpath(doc, '//*[contains(@class, "co_headtext")]')) {
+		let candidate = cleanText(node.textContent)
+		if (candidate === name || (name.indexOf(':') > -1 && candidate.indexOf(base + ':') === 0)) return candidate
+	}
+	return name
+}
+
+//"§ 34 Intervening Acts and Superseding Causes": the section with its heading, from the page's title element
+function restatementSectionName(doc, section) {
+	let node = ZU.xpath(doc, '//*[@id="title"]')[0]
+	let title = node ? cleanText(node.textContent) : ''
+	return title.indexOf(section) === 0 ? title : section
+}
+
+function isRestatement(heading) {
+	return /^\s*Restat(?:ement)?s?\b/i.test(heading || '')
+}
+
+var RESTATEMENT_SERIES = { '1st': 'First', '2d': 'Second', '2nd': 'Second', '3d': 'Third', '3rd': 'Third', '4th': 'Fourth',
+	'first': 'First', 'second': 'Second', 'third': 'Third', 'fourth': 'Fourth' }
+
+//"Restatement of the Law 2d, Torts" and "Restatement 2d of Torts" (Lexis+) -> "Restatement (Second) of Torts"
+function normalizeRestatementName(name) {
+	let n = (name || '').replace(/\s+/g, ' ').trim()
+	let m = /^Restat(?:ement)?(?: of the Law)?,?\s+(1st|2d|2nd|3d|3rd|4th|First|Second|Third|Fourth)\b,?\s+(?:of\s+)?(.+)$/i.exec(n)
+	if (m) return 'Restatement (' + RESTATEMENT_SERIES[m[1].toLowerCase()] + ') of ' + m[2]
+	return n
+}
+
+//-> { name, section, year, edition } from a heading such as
+//  "Restatement (Second) of Torts § 402A (1965)", "Restatement of the Law, Copyright § 1 (Tentative Draft No. 2, 2021)"
+//  or (Lexis+) "Restatement of the Law 2d, Torts § 402A. Special Liability of Seller of Product ...".
+//The item is the work, so the section is returned separately and left out of the name.
+function parseRestatement(raw) {
+	let t = (raw || '').replace(/ /g, ' ').replace(/\s+/g, ' ').trim()
+	let year = '', edition = '', section = ''
+	//a trailing parenthetical with the year and/or the draft: (1965), (Tentative Draft No. 2, 2021)
+	let paren = /\s*\(([^()]*)\)\s*$/.exec(t)
+	if (paren && /\b(?:1[89]|20)\d\d\b|\bdraft\b/i.test(paren[1])) {
+		let y = /\b((?:1[89]|20)\d\d)\b/.exec(paren[1])
+		let d = /((?:Tentative|Council|Discussion|Preliminary|Proposed Final|Final)\s+Draft(?:\s+No\.?\s*\d+)?)/i.exec(paren[1])
+		if (y) year = y[1]
+		if (d) edition = d[1].replace(/\s+/g, ' ').trim()
+		t = t.slice(0, paren.index)
+	}
+	//the section ("§ 402A", "§§ 1-5"); anything after it, such as Lexis+'s section heading, is dropped
+	let sec = /\s*(§§?)\s*([0-9][0-9A-Za-z.\-–]*(?:\s*(?:,|and|to|-|–)\s*[0-9][0-9A-Za-z.\-–]*)*)/.exec(t)
+	if (sec) {
+		section = sec[1] + ' ' + sec[2].replace(/[.,]+$/, '').trim()
+		t = t.slice(0, sec.index)
+	}
+	t = t.replace(/[,.:;\s]+$/, '')
+	return { name: normalizeRestatementName(t), section: section, year: year, edition: edition }
+}
+
+//"Copyright © 1965 American Law Institute" in the text of the page
+function restatementCopyrightYear(doc) {
+	let text = (doc.body && doc.body.textContent) || ''
+	let m = /(?:©|Copyright)\s*(?:\(c\))?\s*((?:1[89]|20)\d\d)[^.]{0,40}American Law Institute/i.exec(text)
+	return m ? m[1] : ''
+}
+
+//The Extra field that marks the item as citation-phoenix's "restatement" type
+function restatementExtra() {
+	return 'mlzsync1:' + JSON.stringify({ xtype: 'restatement' })
+}
 
 //Helper Scripts to Parse Westlaw Text
 function parseCitations(citationArray) { // this is a mess.

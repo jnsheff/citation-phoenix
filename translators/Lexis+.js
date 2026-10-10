@@ -9,7 +9,7 @@
 	"inRepository": true,
 	"translatorType": 4,
 	"browserSupport": "gcsibv",
-	"lastUpdated": "2026-03-26 17:08:40"
+	"lastUpdated": "2026-10-10 20:28:51"
 }
 
 /*
@@ -50,6 +50,9 @@ function detectWeb(doc, _url, citation) {
 	if (title.includes("results")) {
 		return "multiple";
 	}
+	else if (isRestatement(restatementHeading(doc))) { // before the statute test: "Restatement of the Law 2d, Torts § 402A" has a section sign too
+		return "book";
+	}
 	else if (/[a-zA-Z. ]+\s§\s\d+/.test(title)
 	|| /\W(acts?)(\W|$)/i.test(title) // Match: The Airports Acts, Civil Rights Act of 1865
 	|| /p\.l\./i.test(title)) { // Match: ... Tex. Bus. & Com. Code § 26.01 ...
@@ -59,9 +62,83 @@ function detectWeb(doc, _url, citation) {
 	|| /\d+\s[a-zA-Z0-9. ]+\s\d+/.test(activeCitation)) { // Match: ... 5 U.S. 137 ...
 		return "case";
 	}
-	// TODO secondary sources
+	// TODO other secondary sources
 
 	return false;
+}
+
+// Restatements of the Law (American Law Institute). The functions from isRestatement to restatementExtra are shared
+// with translators/Westlaw.js (scripts/test-restatement-translators.html checks that the copies agree).
+
+// "§ 552A Contributory Negligence": the section with its heading, from the first banner (h2.SS_Banner)
+function restatementSectionName(doc, section) {
+	let banner = text(doc, 'h2.SS_Banner');
+	return banner.indexOf(section) === 0 ? banner : section;
+}
+
+// The heading that names the work. Usually the document title ("Restatement of the Law 2d, Torts § 402A. Special Liability ...");
+// on a secondary-source page whose title is the section's own, the work is the first crumb of the table-of-contents trail
+// (as for treatises) and the section is the start of the banner.
+function restatementHeading(doc) {
+	let title = (text(doc, 'h1#SS_DocumentTitle') || normalizeTitle(doc.title)).replace(/\s+\|\s+.*$/, '');
+	if (isRestatement(title)) return title;
+	let crumb = text(doc, '.SS_TOCTrail li a');
+	if (!isRestatement(crumb)) return '';
+	let section = /^(§§?\s*\d[^\s]*)/.exec(text(doc, 'h2.SS_Banner'));
+	return section ? crumb + ' ' + section[1] : crumb;
+}
+
+function isRestatement(heading) {
+	return /^\s*Restat(?:ement)?s?\b/i.test(heading || '')
+}
+
+var RESTATEMENT_SERIES = { '1st': 'First', '2d': 'Second', '2nd': 'Second', '3d': 'Third', '3rd': 'Third', '4th': 'Fourth',
+	'first': 'First', 'second': 'Second', 'third': 'Third', 'fourth': 'Fourth' }
+
+//"Restatement of the Law 2d, Torts" and "Restatement 2d of Torts" (Lexis+) -> "Restatement (Second) of Torts"
+function normalizeRestatementName(name) {
+	let n = (name || '').replace(/\s+/g, ' ').trim()
+	let m = /^Restat(?:ement)?(?: of the Law)?,?\s+(1st|2d|2nd|3d|3rd|4th|First|Second|Third|Fourth)\b,?\s+(?:of\s+)?(.+)$/i.exec(n)
+	if (m) return 'Restatement (' + RESTATEMENT_SERIES[m[1].toLowerCase()] + ') of ' + m[2]
+	return n
+}
+
+//-> { name, section, year, edition } from a heading such as
+//  "Restatement (Second) of Torts § 402A (1965)", "Restatement of the Law, Copyright § 1 (Tentative Draft No. 2, 2021)"
+//  or (Lexis+) "Restatement of the Law 2d, Torts § 402A. Special Liability of Seller of Product ...".
+//The item is the work, so the section is returned separately and left out of the name.
+function parseRestatement(raw) {
+	let t = (raw || '').replace(/ /g, ' ').replace(/\s+/g, ' ').trim()
+	let year = '', edition = '', section = ''
+	//a trailing parenthetical with the year and/or the draft: (1965), (Tentative Draft No. 2, 2021)
+	let paren = /\s*\(([^()]*)\)\s*$/.exec(t)
+	if (paren && /\b(?:1[89]|20)\d\d\b|\bdraft\b/i.test(paren[1])) {
+		let y = /\b((?:1[89]|20)\d\d)\b/.exec(paren[1])
+		let d = /((?:Tentative|Council|Discussion|Preliminary|Proposed Final|Final)\s+Draft(?:\s+No\.?\s*\d+)?)/i.exec(paren[1])
+		if (y) year = y[1]
+		if (d) edition = d[1].replace(/\s+/g, ' ').trim()
+		t = t.slice(0, paren.index)
+	}
+	//the section ("§ 402A", "§§ 1-5"); anything after it, such as Lexis+'s section heading, is dropped
+	let sec = /\s*(§§?)\s*([0-9][0-9A-Za-z.\-–]*(?:\s*(?:,|and|to|-|–)\s*[0-9][0-9A-Za-z.\-–]*)*)/.exec(t)
+	if (sec) {
+		section = sec[1] + ' ' + sec[2].replace(/[.,]+$/, '').trim()
+		t = t.slice(0, sec.index)
+	}
+	t = t.replace(/[,.:;\s]+$/, '')
+	return { name: normalizeRestatementName(t), section: section, year: year, edition: edition }
+}
+
+//"Copyright © 1965 American Law Institute" in the text of the page
+function restatementCopyrightYear(doc) {
+	let text = (doc.body && doc.body.textContent) || ''
+	let m = /(?:©|Copyright)\s*(?:\(c\))?\s*((?:1[89]|20)\d\d)[^.]{0,40}American Law Institute/i.exec(text)
+	return m ? m[1] : ''
+}
+
+//The Extra field that marks the item as citation-phoenix's "restatement" type
+function restatementExtra() {
+	return 'mlzsync1:' + JSON.stringify({ xtype: 'restatement' })
 }
 
 function getSearchResults(doc, url) {
@@ -268,6 +345,26 @@ async function scrape(doc, url) {
 		newStatute.notes.push({ note: "Document Info: " + info }); // Since the info section is all over the place, just dump the whole thing in for manual cite checks
 
 		newStatute.complete();
+	}
+	else if (itemType == "book") {
+		// A restatement: saved as the work (title without the section), as citation-phoenix's "restatement" type
+		let heading = restatementHeading(doc);
+		let parsed = parseRestatement(heading);
+		let year = parsed.year || restatementCopyrightYear(doc);
+
+		let newRestatement = new Zotero.Item("book");
+		newRestatement.title = parsed.name;
+		newRestatement.creators.push({ lastName: "American Law Institute", creatorType: "author", fieldMode: 1 });
+		newRestatement.publisher = "American Law Institute";
+		if (year) newRestatement.date = year;
+		if (parsed.edition) newRestatement.edition = parsed.edition;
+		newRestatement.extra = restatementExtra();
+
+		if (parsed.section) newRestatement.notes.push({ note: "Section: " + restatementSectionName(doc, parsed.section) });
+		let content = doc.getElementById('document-content');
+		if (content) newRestatement.notes.push({ note: "Snapshot: " + heading + content.innerHTML });
+
+		newRestatement.complete();
 	}
 }
 

@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>Restatement translator harness</title></head>
+<body><pre id="out">running…</pre>
+<script>
+// Runs translators/Westlaw.js and translators/Lexis+.js against the fixtures in scripts/restatement-fixtures/ with a
+// minimal Zotero mock, and checks what they detect and save. The fixtures are SYNTHETIC (see the comment in each file):
+// real Westlaw and Lexis+ pages are behind a login, so confirm on a real page when you can.
+// Serve the repository root (python3 -m http.server) and open /scripts/test-restatement-translators.html.
+// The last line says RESULT: ALL PASSED or how many checks failed.
+
+const FIX = 'restatement-fixtures/';
+const lines = []; let checks = 0, failed = 0;
+function eq(actual, expected, label) {
+  checks++;
+  const a = JSON.stringify(actual), e = JSON.stringify(expected);
+  if (a === e) lines.push('  ok   ' + label);
+  else { failed++; lines.push('  FAIL ' + label + '\n         got  ' + a + '\n         want ' + e); }
+}
+
+// ---- a minimal Zotero / ZU mock
+const ZU = {
+  xpath(doc, expr) {
+    const r = doc.evaluate(expr, doc, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null), out = [];
+    for (let i = 0; i < r.snapshotLength; i++) out.push(r.snapshotItem(i));
+    return out;
+  },
+  xpathText(doc, expr) { const n = ZU.xpath(doc, expr); return n.length ? n.map(x => x.textContent).join(', ') : null; },
+  capitalizeTitle(s) { return s; }, trim(s) { return String(s).trim(); }, debug() {},
+};
+function text(doc, sel, i) { const el = doc.querySelectorAll(sel)[i || 0]; return el ? el.textContent.trim() : ''; }
+
+async function load(translatorFile) {
+  let src = await (await fetch('../translators/' + translatorFile)).text();
+  const source = src;
+  src = src.replace(/^\s*\{[\s\S]*?\n\}\s*\n/, ''); // drop the JSON header
+  return { source, src };
+}
+async function fixture(name) {
+  return new DOMParser().parseFromString(await (await fetch(FIX + name)).text(), 'text/html');
+}
+// -> { type: detectWeb(), item: the saved item or null }
+async function run(src, doc, url) {
+  const items = [];
+  function Item(type) { this.itemType = type; this.creators = []; this.notes = []; this.attachments = []; this.tags = []; this.complete = () => items.push(this); }
+  const f = new Function('Zotero', 'ZU', 'text', 'doc', 'url',
+    src + '\nreturn (async () => { const type = detectWeb(doc, url); await doWeb(doc, url); return type; })();');
+  const type = await f({ Item }, ZU, text, doc, url);
+  const it = items[0] || null;
+  return { type, item: it, saved: items.length };
+}
+const notesText = it => (it ? it.notes.map(n => n.note.replace(/<[^>]*>/g, '').slice(0, 100)) : []);
+
+async function main() {
+  const W = await load('Westlaw.js'), L = await load('Lexis+.js');
+  const RX = { itemType: 'book', creators: [{ lastName: 'American Law Institute', creatorType: 'author', fieldMode: 1 }], publisher: 'American Law Institute', extra: 'mlzsync1:{"xtype":"restatement"}' };
+
+  lines.push('Westlaw');
+  let r = await run(W.src, await fixture('westlaw-torts-402a.html'), 'https://1.next.westlaw.com/Document/x');
+  eq([r.type, r.saved], ['book', 1], 'a restatement is detected and saved');
+  eq([r.item.itemType, r.item.title, r.item.date, r.item.edition], ['book', 'Restatement (Second) of Torts', '1965', undefined], 'title is the work, year from the heading, no draft');
+  eq([r.item.creators, r.item.publisher, r.item.extra], [RX.creators, RX.publisher, RX.extra], 'author, publisher and the citation-phoenix marker');
+  eq(notesText(r.item)[0], 'Section: § 402A', 'the section is kept in a note, not in the title');
+  eq(notesText(r.item)[1].startsWith('Snapshot: '), true, 'and a snapshot note follows');
+  r = await run(W.src, await fixture('westlaw-copyright-draft.html'), 'https://1.next.westlaw.com/Document/y');
+  eq([r.item.title, r.item.edition, r.item.date, notesText(r.item)[0]], ['Restatement of the Law, Copyright', 'Tentative Draft No. 2', '2021', 'Section: § 1'], 'a draft: edition holds the draft name');
+  r = await run(W.src, await fixture('westlaw-torts-third-subtitle.html'), 'https://1.next.westlaw.com/Document/z');
+  eq([r.item.title, r.item.date], ['Restatement (Third) of Torts: Liability for Physical and Emotional Harm', '2010'], 'a subtitle stays in the title');
+  r = await run(W.src, await fixture('westlaw-contracts-no-year.html'), 'https://1.next.westlaw.com/Document/w');
+  eq([r.item.title, r.item.date], ['Restatement (Second) of Contracts', '1981'], 'no year in the heading: taken from the copyright line');
+  r = await run(W.src, await fixture('westlaw-restatement-secondary-markup.html'), 'https://1.next.westlaw.com/Document/m');
+  eq([r.type, r.item && r.item.title, r.item && r.item.date, r.item && notesText(r.item)[0]], ['book', 'Restatement (Second) of Torts', '1965', 'Section: § 402A. Special Liability of Seller of Product for Physical Harm to User or Consumer'], 'a secondary-source page whose <title> is the section name: the work is read from the citation line (.co_cites); the section keeps its heading');
+  r = await run(W.src, await fixture('westlaw-real-torts-34.html'), 'https://1.next.westlaw.com/Document/r');
+  eq([r.type, r.item && r.item.title, r.item && r.item.date, r.item && notesText(r.item)[0]], ['book', 'Restatement (Third) of Torts: Liability for Physical and Emotional Harm', '2010', 'Section: § 34 Intervening Acts and Superseding Causes'], 'a real page: the full title from the breadcrumb (not the abbreviated citation line), and the section with its name');
+  r = await run(W.src, await fixture('westlaw-case.html'), 'https://1.next.westlaw.com/Document/c');
+  eq(r.type, 'case', 'a case page is still a case');
+  r = await run(W.src, await fixture('westlaw-treatise.html'), 'https://1.next.westlaw.com/Document/t');
+  eq([r.type === undefined, r.saved], [true, 0], 'a treatise page is not mistaken for a restatement (nothing detected, nothing saved)');
+
+  lines.push('Lexis+');
+  r = await run(L.src, await fixture('lexis-torts-402a.html'), 'https://plus.lexis.com/document/x');
+  eq([r.type, r.saved], ['book', 1], 'a restatement is a book, not the statute its section sign suggests');
+  eq([r.item.title, r.item.date, r.item.extra], ['Restatement (Second) of Torts', '1965', RX.extra], 'Lexis+ wording ("Restatement of the Law 2d, Torts") is normalized; year from the copyright line');
+  eq([r.item.creators, r.item.publisher], [RX.creators, RX.publisher], 'author and publisher');
+  eq(notesText(r.item)[0], 'Section: § 402A', 'the section, without its heading');
+  r = await run(L.src, await fixture('lexis-contracts-short.html'), 'https://plus.lexis.com/document/y');
+  eq([r.type, r.item.title, notesText(r.item)[0]], ['book', 'Restatement (Second) of Contracts', 'Section: § 90'], '"Restatement 2d of Contracts § 90 | Lexis+" is normalized too');
+  eq(r.item.date === undefined, true, 'and no year is invented');
+  r = await run(L.src, await fixture('lexis-restatement-crumb.html'), 'https://plus.lexis.com/document/m');
+  eq([r.type, r.item && r.item.title, r.item && r.item.date, r.item && notesText(r.item)[0]], ['book', 'Restatement (Second) of Torts', '1965', 'Section: § 402A Special Liability of Seller of Product for Physical Harm to User or Consumer'], 'a page whose title is the section name: the work is the first crumb of the table-of-contents trail, the section heading comes from the banner');
+  r = await run(L.src, await fixture('lexis-restat-abbrev.html'), 'https://plus.lexis.com/document/q');
+  eq([r.type, r.item && r.item.title, r.item && notesText(r.item)[0]], ['book', 'Restatement (Second) of Torts', 'Section: § 552A'], 'Lexis+ abbreviates the title ("Restat 2d of Torts, § 552A", the name of a real saved page)');
+  r = await run(L.src, await fixture('lexis-real-restat-552a.html'), 'https://plus.lexis.com/document/real');
+  eq([r.type, r.item && r.item.title, r.item && r.item.date, r.item && notesText(r.item)[0], r.item && r.item.extra], ['book', 'Restatement (Second) of Torts', '1977', 'Section: § 552A Contributory Negligence', RX.extra], 'a real page: title and section from the document title and banner, year from the closing "Copyright (c) 1977, The American Law Institute" line');
+  const st = await fixture('lexis-statute.html');
+  eq((await run(L.src, st, 'https://plus.lexis.com/document/s').catch(e => ({ type: 'ERROR ' + e.message }))).type === 'book', false, 'a codified statute page is not a restatement');
+
+  lines.push('Shared code');
+  const block = s => (/function isRestatement\([\s\S]*?function restatementExtra\(\) \{[\s\S]*?\n\}/.exec(s) || [''])[0];
+  eq(block(W.source).length > 500 && block(W.source) === block(L.source), true, 'the functions isRestatement … restatementExtra are identical in both translators');
+  const P = new Function('ZU', W.src + '\nreturn parseRestatement;')(ZU);
+  const cases = [
+    ['Restatement (Second) of Torts § 402A (1965)', { name: 'Restatement (Second) of Torts', section: '§ 402A', year: '1965', edition: '' }],
+    ['Restatement (Second) of Torts §§ 402A-402B (1965)', { name: 'Restatement (Second) of Torts', section: '§§ 402A-402B', year: '1965', edition: '' }],
+    ['Restatement (Second) of Torts', { name: 'Restatement (Second) of Torts', section: '', year: '', edition: '' }],
+    ['Restat 2d of Torts, § 552A', { name: 'Restatement (Second) of Torts', section: '§ 552A', year: '', edition: '' }],
+    ['Restatement 2d of Contracts § 90', { name: 'Restatement (Second) of Contracts', section: '§ 90', year: '', edition: '' }],
+    ['Restatement of the Law 3d, Property (Wills & Donative Transfers) § 1.1', { name: 'Restatement (Third) of Property (Wills & Donative Transfers)', section: '§ 1.1', year: '', edition: '' }],
+    ['Restatement of the Law, Copyright § 1 (Tentative Draft No. 2, 2021)', { name: 'Restatement of the Law, Copyright', section: '§ 1', year: '2021', edition: 'Tentative Draft No. 2' }],
+    ['Restatement of the Law, Third, Torts: Remedies (Council Draft No. 3)', { name: 'Restatement (Third) of Torts: Remedies', section: '', year: '', edition: 'Council Draft No. 3' }],
+  ];
+  for (const [input, want] of cases) eq(P(input), want, 'parse: ' + input);
+
+  lines.push('', failed ? 'RESULT: ' + failed + ' of ' + checks + ' checks FAILED' : 'RESULT: ALL PASSED (' + checks + ' checks)');
+  document.getElementById('out').textContent = lines.join('\n');
+}
+main().catch(e => { document.getElementById('out').textContent = lines.join('\n') + '\nERROR ' + e + '\n' + e.stack; });
+</script></body></html>
