@@ -248,3 +248,47 @@ Run these from the repository root with Node:
 
 The abbreviation harness also verifies domain-sensitive auto datasets such as
 French Canadian `auto-ca-fr`.
+
+## Attribution And Licensing
+
+This repository is a fork of [citation-phoenix](https://github.com/rischconsulting/citation-phoenix)
+by Michael Risch, maintained by Jeremy Sheff. The fork adds Bluebook periodical
+abbreviation rules, year-only dates for reports, hearings and regulations, and
+other changes. See the commit history for details.
+
+### Credits
+
+- **Michael Risch** wrote citation-phoenix, including the plugin, the Westlaw
+  and Lexis+ translators and the bundling of the Juris-M styles. Georg Duffner
+  contributed commits to the upstream repository.
+- **Frank Bennett** created Juris-M, CSL-M and the legal resource registry and
+  abbreviation datasets on which citation-phoenix's jurisdiction, court and
+  abbreviation data are based.
+- **Charles Duan** wrote [hicite](https://github.com/charlesduan/hicite), the LaTeX
+  legal citation package that the companion hicite export tools target.
+
+### Licensing status
+
+The upstream repository does not state a license for the plugin's own code. The
+fork is distributed with Michael Risch's permission: he agreed, in an email to
+Jeremy Sheff dated November 22, 2026, to Sheff reproducing, distributing and
+preparing derivative works of citation-phoenix's functionality and code, with
+attribution. That permission is personal to Sheff. It is not a public license,
+and it does not by itself allow anyone else to reuse or redistribute the
+plugin's code. Anyone who wants to build on this code should ask the upstream
+author, or wait until a license is added.
+
+Bundled third-party material keeps its own terms:
+
+- `juris-abbrevs/` is licensed under the MIT License, copyright 2014 Frank
+  Bennett (see `juris-abbrevs/LICENSE`).
+- `style-modules/` is dedicated to the public domain under CC0 1.0 (see
+  `style-modules/LICENSE`).
+- The bundled CSL styles carry the license stated in each file's `<rights>`
+  element, for example CC BY-SA 3.0 for `jm-indigobook.csl`.
+- The Zotero translators in `translators/` and the other files copied from
+  upstream sources are subject to whatever terms those sources impose.
+
+The `Sheff-IndigoBook` styles are adapted from the JM Indigo Book style by Frank
+Bennett and are shared under CC BY-SA 4.0, as stated in their `<rights>`
+elements.
