@@ -172,6 +172,10 @@
         "name":  "auto-ch-fr.json"
     },
     {
+        "filename":  "auto-ch-it.json",
+        "name":  "auto-ch-it.json"
+    },
+    {
         "filename":  "auto-ci.json",
         "name":  "Abbreviations: Côte d\u0027Ivoire legal"
     },
@@ -1062,6 +1066,10 @@
     {
         "filename":  "auto-zz-fr.json",
         "name":  "auto-zz-fr.json"
+    },
+    {
+        "filename":  "casetitle-us-indigobook.json",
+        "name":  "Abbreviations: Secondary materials and case titles for the US (IndigoBook styles)"
     },
     {
         "filename":  "LICENSE",

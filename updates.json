@@ -3,8 +3,8 @@
     "citation-phoenix@michaelrisch.com": {
       "updates": [
         {
-          "version": "0.8.5",
-          "update_link": "https://github.com/jnsheff/citation-phoenix/releases/download/0.8.5b/citation-phoenix-0.8.5.xpi",
+          "version": "0.9.4",
+          "update_link": "https://github.com/jnsheff/citation-phoenix/releases/download/0.9.4b/citation-phoenix-0.9.4.xpi",
           "applications": {
             "zotero": {
               "strict_min_version": "8.0",
