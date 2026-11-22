@@ -1757,7 +1757,7 @@
                   </conditions>
                   <group delimiter=" ">
                     <text variable="publisher"/>
-                    <date form="text" date-parts="year-month-day" variable="issued"/>
+                    <date form="text" date-parts="year" variable="issued"/>
                   </group>
                 </if>
                 <else-if variable="gazette-flag">
@@ -1787,7 +1787,7 @@
                             <text variable="genre"/>
                           </if>
                         </choose>
-                        <date form="text" date-parts="year-month-day" variable="issued"/>
+                        <date form="text" date-parts="year" variable="issued"/>
                       </if>
                       <else>
                         <date form="text" date-parts="year" variable="publication-date"/>
@@ -1809,18 +1809,8 @@
                 </group>
               </group>
             </else-if>
-            <else-if type="report">
-              <date form="text" date-parts="year-month-day" variable="issued"/>
-            </else-if>
-            <else-if type="hearing">
-              <choose>
-                <if match="none" variable="committee">
-                  <date form="text" date-parts="year-month-day" variable="issued"/>
-                </if>
-                <else>
-                  <date form="text" date-parts="year" variable="issued"/>
-                </else>
-              </choose>
+            <else-if type="report hearing" match="any">
+              <date form="text" date-parts="year" variable="issued"/>
             </else-if>
           </choose>
         </group>

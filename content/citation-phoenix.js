@@ -1095,6 +1095,10 @@ ${mlzBlock}` : mlzBlock;
       if (normalizedKeyNoDots && normalizedKeyNoDots !== normalizedKey) {
         containerTitleKeys.push(normalizedKeyNoDots);
       }
+      for (const withArticle of [...containerTitleKeys]) {
+        const bare = withArticle.replace(/^the\s+/, "");
+        if (bare && !containerTitleKeys.includes(bare)) containerTitleKeys.push(bare);
+      }
       let hit = null;
       if (category === "institution-part" || category === "institution-entire") {
         hit = this._lookupInstitutionCategoryValue(
@@ -1380,7 +1384,20 @@ ${mlzBlock}` : mlzBlock;
       });
     }
     abbreviateContainerTitleFallback(title, jur) {
-      return this._abbreviateByWords(title, jur, ["container-title"]);
+      const original = (title || "").toString().trim();
+      const source = original.replace(/^the\s+/i, "");
+      if (!source) return null;
+      const result = this._applyPeriodicalConventions(this._abbreviateByWords(source, jur, ["container-title"]) || source);
+      return result && result !== original ? result : null;
+    }
+    _applyPeriodicalConventions(text) {
+      let out = text.replace(/(?:\s+(?:of|the))+(?=\s+\S)/gi, "").replace(/\s+and\s+/gi, " & ").replace(/^L\. &/, "Law &");
+      let previous;
+      do {
+        previous = out;
+        out = out.replace(/(^|[\s(])([A-Z]\.)\s+(?=[A-Z]\.(?:\s|$|[,)]))/g, "$1$2");
+      } while (out !== previous);
+      return out.replace(/\s{2,}/g, " ").trim();
     }
     abbreviateTitleFallback(title, jur) {
       return this._abbreviateByWords(title, jur, ["title", "container-title"]);
@@ -1403,6 +1420,7 @@ ${mlzBlock}` : mlzBlock;
         const phraseWords = [];
         let bestMatch = null;
         for (let scan = index; scan < segments.length && phraseWords.length < 4; scan += 1) {
+          if (segments[scan].type === "literal") break;
           if (segments[scan].type !== "word") continue;
           phraseWords.push(segments[scan].text);
           const normalized = this.normalizeKey(phraseWords.join(" "));
@@ -1427,12 +1445,12 @@ ${mlzBlock}` : mlzBlock;
     }
     _tokenizeWordAndSeparatorSegments(source) {
       const segments = [];
-      const matcher = /([A-Za-z0-9]+|[^A-Za-z0-9]+)/g;
+      const matcher = /((?:[A-Za-z]\.){2,}(?![A-Za-z0-9])|[A-Za-z0-9]+|[^A-Za-z0-9]+)/g;
       let match;
       while ((match = matcher.exec(source)) !== null) {
         const text = match[0];
         segments.push({
-          type: /^[A-Za-z0-9]+$/.test(text) ? "word" : "sep",
+          type: /^[A-Za-z0-9]+$/.test(text) ? "word" : /^(?:[A-Za-z]\.){2,}$/.test(text) ? "literal" : "sep",
           text
         });
       }
@@ -1453,7 +1471,7 @@ ${mlzBlock}` : mlzBlock;
     _abbreviateCoreWord(word, jur, categories) {
       const normalized = this.normalizeKey(word);
       if (!normalized) return word;
-      const hit = this._lookupFallbackPhrase(normalized, jur, categories) || this._lookupSupplementalWord(normalized);
+      const hit = this._lookupFallbackPhrase(normalized, jur, categories) || this._lookupSupplementalWord(normalized) || (categories.length === 1 && categories[0] === "container-title" ? this._lookupPeriodicalWord(normalized) : null);
       if (!hit?.value) return word;
       return this.parseDirective(hit.value).value;
     }
@@ -2166,6 +2184,47 @@ ${mlzBlock}` : mlzBlock;
         Zotero?.Prefs?.set?.(this._jurisdictionOverridesPref, JSON.stringify(this._userJurisdictionOverrides || {}));
       } catch (e) {
       }
+    }
+    // Bluebook T10 (states) and T13 (periodicals) words the datasets lack; used for periodical names only, after the datasets.
+    _lookupPeriodicalWord(normalized) {
+      const words = {
+        "alabama": "Ala.",
+        "arizona": "Ariz.",
+        "arkansas": "Ark.",
+        "california": "Cal.",
+        "colorado": "Colo.",
+        "connecticut": "Conn.",
+        "delaware": "Del.",
+        "florida": "Fla.",
+        "georgia": "Ga.",
+        "illinois": "Ill.",
+        "indiana": "Ind.",
+        "kansas": "Kan.",
+        "kentucky": "Ky.",
+        "louisiana": "La.",
+        "maryland": "Md.",
+        "massachusetts": "Mass.",
+        "michigan": "Mich.",
+        "minnesota": "Minn.",
+        "mississippi": "Miss.",
+        "missouri": "Mo.",
+        "montana": "Mont.",
+        "nebraska": "Neb.",
+        "nevada": "Nev.",
+        "oklahoma": "Okla.",
+        "oregon": "Or.",
+        "pennsylvania": "Pa.",
+        "tennessee": "Tenn.",
+        "texas": "Tex.",
+        "vermont": "Vt.",
+        "virginia": "Va.",
+        "washington": "Wash.",
+        "wisconsin": "Wis.",
+        "wyoming": "Wyo.",
+        "columbia": "Colum."
+      };
+      const value = words[normalized] || null;
+      return value ? { jurisdiction: "default", value } : null;
     }
     _lookupSupplementalWord(normalized) {
       const supplemental = {
@@ -5960,7 +6019,7 @@ ${mlzBlock}` : mlzBlock;
     }
     _styleAllowsContainerTitleFallback(styleID) {
       const key = String(styleID || "").trim().toLowerCase();
-      return key === "http://juris-m.github.io/styles/jm-indigobook" || key === "http://juris-m.github.io/styles/jm-indigobook-law-review";
+      return key === "http://juris-m.github.io/styles/jm-indigobook" || key === "http://juris-m.github.io/styles/jm-indigobook-law-review" || key === "http://www.zotero.org/styles/sheff-indigobook" || key === "http://www.zotero.org/styles/sheff-indigobook-law-review";
     }
     _isEnglishLanguage(language) {
       const value = String(language || "").trim().toLowerCase();

@@ -268,9 +268,28 @@ try {
   console.error('FAIL Import reports unchanged rows as skipped with a reason');
 }
 
+const periodicalCases = [
+  ['The Yale Law Journal', 'Yale L.J.', 'leading "The" is left out of a periodical (table hit)'],
+  ['Law and Contemporary Problems', 'Law & Contemp. Probs.', '"and" is set as "&" and a leading "Law" before "&" stays'],
+  ['Columbia Journal of Law & the Arts', 'Colum. J.L. & Arts', '"of" and "the" are left out; adjacent single capitals are closed up'],
+  ['Virginia Journal of Law and Technology', 'Va. J.L. & Tech.', 'state names in periodicals are abbreviated (T10)'],
+  ['Journal of the Copyright Society of the U.S.A.', 'J. Copyright Soc’y U.S.A.', 'a dotted initialism keeps its periods'],
+  ['The New Yorker', 'New Yorker', 'a periodical with no abbreviation loses only its leading "The"'],
+];
+for (const [key, expected, label] of periodicalCases) {
+  const actual = service.lookupForCiteProc('container-title', key, 'default')?.value || null;
+  try {
+    assert.equal(actual, expected);
+    console.log(`PASS Periodical: ${label}: ${key} -> ${actual}`);
+  } catch (error) {
+    failures += 1;
+    console.error(`FAIL Periodical: ${label}: expected ${expected} but got ${actual}`);
+  }
+}
+
 if (failures) {
   process.exitCode = 1;
   console.error(`\n${failures} abbreviation regression test(s) failed.`);
 } else {
-  console.log(`\nAll ${cases.length + optionCases.length + 8} abbreviation regression tests passed.`);
+  console.log(`\nAll ${cases.length + optionCases.length + periodicalCases.length + 8} abbreviation regression tests passed.`);
 }
