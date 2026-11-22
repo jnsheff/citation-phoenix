@@ -2354,6 +2354,7 @@ ${mlzBlock}` : mlzBlock;
       this._journalAbbrByContainerTitleKey = /* @__PURE__ */ new Map();
       this._containerTitleShortByKey = /* @__PURE__ */ new Map();
       this._containerTitleContextByKey = /* @__PURE__ */ new Map();
+      this._containerTitleOriginalByKey = /* @__PURE__ */ new Map();
       this._titleContextByKey = /* @__PURE__ */ new Map();
       this._activeStyleID = "";
     }
@@ -2385,6 +2386,7 @@ ${mlzBlock}` : mlzBlock;
       this._journalAbbrByContainerTitleKey.clear();
       this._containerTitleShortByKey.clear();
       this._containerTitleContextByKey.clear();
+      this._containerTitleOriginalByKey.clear();
       this._titleContextByKey.clear();
       this._caseReporterValues.clear();
       const sysProto = Zotero?.Cite?.System?.prototype;
@@ -5894,6 +5896,9 @@ ${mlzBlock}` : mlzBlock;
       if (!containerTitle) return;
       const key = this.abbrevService.normalizeKey(containerTitle);
       if (!key) return;
+      if (!this._containerTitleOriginalByKey.has(key)) {
+        this._containerTitleOriginalByKey.set(key, containerTitle);
+      }
       const shortTitle = String(cslItem?.["container-title-short"] || "").trim();
       if (shortTitle) {
         this._containerTitleShortByKey.set(key, shortTitle);
@@ -5961,7 +5966,7 @@ ${mlzBlock}` : mlzBlock;
       return `<span class="nocase">${this._escapeNoCaseText(text)}</span>`;
     }
     _escapeNoCaseText(value) {
-      return String(value || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+      return String(value || "").replace(/</g, "&lt;").replace(/>/g, "&gt;");
     }
     _decorateShortForms(cslItem, jur, styleID = "") {
       try {
@@ -6118,7 +6123,8 @@ ${mlzBlock}` : mlzBlock;
             }
           }
           const lookupNoHints = category === "title" ? !self._shouldAllowTitleFallback(key, styleID, jur) : category === "container-title" ? !self._shouldAllowContainerTitleFallback(key, styleID) : noHints;
-          const hit = self.abbrevService.lookupForCiteProc(category, key, jur, { noHints: lookupNoHints });
+          const lookupSource = category === "container-title" ? self._containerTitleOriginalByKey.get(self.abbrevService.normalizeKey(key)) || key : key;
+          const hit = self.abbrevService.lookupForCiteProc(category, lookupSource, jur, { noHints: lookupNoHints });
           if (hit?.value) {
             const targetJur = hit.jurisdiction || jur || "default";
             if (!obj[targetJur]) obj[targetJur] = self._newAbbreviationSegments(this);
