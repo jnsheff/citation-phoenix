@@ -269,19 +269,34 @@ other changes. See the commit history for details.
 
 ### Licensing status
 
-The upstream repository does not state a license for the plugin's own code. The
-fork is distributed with Michael Risch's permission: he agreed, in an email to
-Jeremy Sheff dated November 22, 2026, to Sheff reproducing, distributing and
-preparing derivative works of citation-phoenix's functionality and code, with
-attribution. That permission is personal to Sheff. It is not a public license,
-and it does not by itself allow anyone else to reuse or redistribute the
-plugin's code. Anyone who wants to build on this code should ask the upstream
-author, or wait until a license is added.
+The upstream repository does not state a public license for the plugin's own
+code. Michael Risch has granted Jeremy Sheff, by email on November 22, 2026, a
+perpetual, transferable, sublicenseable, worldwide, royalty-free license to
+reproduce, prepare derivative works of, and redistribute any copyrighted
+content that Risch owns, or comes to own, in the citation-phoenix repository.
+Sheff distributes this fork, and may license his own derivative works, under
+that grant, with attribution to the upstream author as a matter of courtesy.
+
+The grant is limited to what Risch owns. It does not cover the third-party
+material below. Georg Duffner's four commits to the upstream repository
+(July 2026) changed only jurisdiction data for Austria, Switzerland,
+Liechtenstein and the International Criminal Court. That data comes from the
+Juris-M legal-resource-registry, to which Duffner also contributed, and which is
+MIT-licensed, so it is covered by the MIT license listed below and not by
+Risch's grant.
+
+The grant is not a public license: it gives no rights to anyone but Sheff and
+those to whom Sheff sublicenses. Someone who wants to reuse the upstream code
+directly should ask Risch.
 
 Bundled third-party material keeps its own terms:
 
 - `juris-abbrevs/` is licensed under the MIT License, copyright 2014 Frank
-  Bennett (see `juris-abbrevs/LICENSE`).
+  Bennett (see `juris-abbrevs/LICENSE`). The `auto-*.json` files are built from
+  the MIT-licensed Juris-M legal-resource-registry (copyright 2019 Juris-M
+  Project), whose contributors include Georg Duffner. Its license notice is in
+  `juris-abbrevs/LICENSE-legal-resource-registry`; the `juris-maps/` data is built
+  from the same source.
 - `style-modules/` is dedicated to the public domain under CC0 1.0 (see
   `style-modules/LICENSE`).
 - The bundled CSL styles carry the license stated in each file's `<rights>`
